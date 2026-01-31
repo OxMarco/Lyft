@@ -1,0 +1,136 @@
+#include "power.h"
+#include "config.h"
+#include "display.h"
+#include "imu.h"
+#include "workout.h"
+#include "storage.h"
+#include "battery.h"
+#include "esp_sleep.h"
+
+// Button B is GPIO 9 (active LOW - pressed = LOW)
+#define SLEEP_BUTTON_PIN 9
+#define BUTTON_LONG_PRESS_MS 1500  // 1.5 seconds for long press
+
+// Button state tracking
+static bool lastButtonState = true;  // HIGH when not pressed
+static unsigned long buttonPressStart = 0;
+static bool longPressHandled = false;
+
+// Wake tracking
+static bool justWokeFromSleep = false;
+
+void powerInit() {
+    // Configure sleep button as input with pull-up
+    pinMode(SLEEP_BUTTON_PIN, INPUT_PULLUP);
+    
+    // Check if we woke from light sleep
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+        Serial.println("Woke from light sleep via button");
+        justWokeFromSleep = true;
+    }
+    
+    Serial.printf("Power init - Sleep button: GPIO%d (long press to sleep)\n", SLEEP_BUTTON_PIN);
+}
+
+void powerUpdate() {
+    bool currentState = digitalRead(SLEEP_BUTTON_PIN);
+    unsigned long now = millis();
+    
+    // Button just pressed (HIGH -> LOW)
+    if (currentState == LOW && lastButtonState == HIGH) {
+        buttonPressStart = now;
+        longPressHandled = false;
+    }
+    
+    // Button held down - check for long press
+    if (currentState == LOW && !longPressHandled) {
+        if (now - buttonPressStart >= BUTTON_LONG_PRESS_MS) {
+            longPressHandled = true;
+            Serial.println("Long press detected - entering light sleep");
+            powerEnterLightSleep();
+            // Execution continues here after wake
+        }
+    }
+    
+    // Button released
+    if (currentState == HIGH && lastButtonState == LOW) {
+        if (!longPressHandled) {
+            // Short press - could add other functionality here
+            Serial.println("Button short press (no action)");
+        }
+    }
+    
+    lastButtonState = currentState;
+}
+
+void powerEnterLightSleep() {
+    Serial.println("Preparing for light sleep...");
+    
+    // Stop workout if running and save data
+    if (workoutIsRunning()) {
+        workoutStop();
+        storageSaveSession(workoutGetData());
+    }
+    
+    // Put IMU in low power mode
+    imuSleep();
+    
+    // Turn off display
+    displaySleep();
+    
+    Serial.println("Entering light sleep... (press button to wake)");
+    Serial.flush();
+    
+    // Small delay to ensure button is released before we configure wake
+    delay(100);
+    
+    // Wait for button to be released (HIGH) before sleeping
+    // This prevents immediate wake-up
+    while (digitalRead(SLEEP_BUTTON_PIN) == LOW) {
+        delay(10);
+    }
+    delay(50);  // Debounce
+    
+    // Configure GPIO 9 as wake source (wake on LOW level = button press)
+    gpio_wakeup_enable((gpio_num_t)SLEEP_BUTTON_PIN, GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+    
+    // Enter light sleep - CPU stops here
+    esp_light_sleep_start();
+    
+    // ========== EXECUTION RESUMES HERE AFTER WAKE ==========
+    
+    Serial.println("Woke from light sleep!");
+    justWokeFromSleep = true;
+    
+    // Wait for button release
+    while (digitalRead(SLEEP_BUTTON_PIN) == LOW) {
+        delay(10);
+    }
+    delay(50);  // Debounce
+    
+    // Restore peripherals
+    Serial.println("Restoring peripherals...");
+    
+    // Wake IMU
+    imuWake();
+    
+    // Wake display and redraw UI
+    displayWake();
+    displayRedrawUI(batteryGetPercent());
+
+    // Reset button state to prevent retriggering
+    lastButtonState = HIGH;
+    longPressHandled = false;
+    
+    Serial.println("System restored - ready!");
+}
+
+bool powerJustWoke() {
+    return justWokeFromSleep;
+}
+
+void powerClearWokeFlag() {
+    justWokeFromSleep = false;
+}
