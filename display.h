@@ -57,5 +57,6 @@ Arduino_GFX* displayGetGFX();
 void displayDrawSwipeIndicator();
 void displayShowSettings();
 bool displayInSettingsBackButton(int16_t x, int16_t y);
+bool displaySettingsHandleTouch(int16_t x, int16_t y);
 
 #endif // DISPLAY_H

@@ -3,37 +3,37 @@
 
 #include <Arduino.h>
 
-// Workout state
-struct WorkoutData {
-    int repCount;
-    float peakVelocity;      // Peak velocity of entire set
-    unsigned long elapsedTime;  // In seconds
-    bool isRunning;
-};
+// ---- Lifecycle ----
 
-// Initialize workout system
 void workoutInit();
-
-// Start a new workout session
+void workoutReset();
 void workoutStart();
-
-// Stop the current workout session
 void workoutStop();
+bool workoutIsRunning();
+bool workoutIsSetActive();
 
-// Process a velocity reading for rep detection
-// Call this frequently with current velocity
+// ---- Data input ----
+
 void workoutProcessVelocity(float velocity);
-
-// Update elapsed time (call from main loop)
 void workoutUpdateTime();
 
-// Get current workout data
-WorkoutData workoutGetData();
+// ---- Sensitivity ----
 
-// Check if workout is currently running
-bool workoutIsRunning();
+// Set sensitivity from 1-100 slider value
+// 1-25 = BASE, 26-50 = LOW, 51-75 = MEDIUM, 76-100 = HIGH
+void workoutSetSensitivity(int value);
 
-// Reset all workout data
-void workoutReset();
+// Get current sensitivity level (0-3)
+int workoutGetSensitivityLevel();
+
+// Get display name for current sensitivity
+const char* workoutGetSensitivityName();
+
+// ---- Stats getters ----
+
+uint32_t workoutGetTotalTimeMs();
+uint32_t workoutGetRestTimeMs();
+float workoutGetPeakVelocity();
+int workoutGetReps();
 
 #endif // WORKOUT_H

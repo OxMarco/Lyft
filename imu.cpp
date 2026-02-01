@@ -3,41 +3,36 @@
 #include "display.h"
 #include "SensorQMI8658.hpp"
 #include <Wire.h>
+#include <math.h>
 
 static SensorQMI8658 qmi;
 
-// Calibration data
-static float gravityX = 0, gravityY = 0, gravityZ = 0;
+// Gravity estimate (LPF-tracked)
+static float gX = 0, gY = 0, gZ = 0;
 static bool isCalibrated = false;
 
-// Velocity state
+// Velocity state (vertical-axis velocity in m/s)
 static float currentVelocity = 0;
+
+// Latest sensor readings (cached for external queries)
+static float lastAx = 0, lastAy = 0, lastAz = 0;
+static float lastGx = 0, lastGy = 0, lastGz = 0;
+
+// Stationary detection threshold (how close to 1g)
+static const float STATIONARY_THRESHOLD = 0.08f;
 
 bool imuInit() {
   bool ret = qmi.begin(Wire, QMI8658_L_SLAVE_ADDRESS, I2C_SDA, I2C_SCL);
-  if (!ret) {
-    Serial.println("Failed to find QMI8658!");
-    return false;
-  }
+  if (!ret) { Serial.println("Failed to find QMI8658!"); return false; }
 
-  if (!qmi.selfTestAccel()) {
-    Serial.println("Accelerometer self-test failed!");
-    return false;
-  }
+  if (!qmi.selfTestAccel()) { Serial.println("Accelerometer self-test failed!"); return false; }
+  if (!qmi.selfTestGyro())  { Serial.println("Gyroscope self-test failed!"); return false; }
 
-  if (!qmi.selfTestGyro()) {
-    Serial.println("Gyroscope self-test failed!");
-    return false;
-  }
-
-  // Configure accelerometer for gym tracking
-  // 4G range is good for most barbell exercises
   qmi.configAccelerometer(
     SensorQMI8658::ACC_RANGE_4G,
     SensorQMI8658::ACC_ODR_500Hz,
     SensorQMI8658::LPF_MODE_0);
 
-  // Configure gyroscope
   qmi.configGyroscope(
     SensorQMI8658::GYR_RANGE_256DPS,
     SensorQMI8658::GYR_ODR_448_4Hz,
@@ -52,7 +47,7 @@ bool imuInit() {
 
 void imuCalibrate() {
   const int samples = 50;
-  float sumX = 0, sumY = 0, sumZ = 0;
+  float sumAx = 0, sumAy = 0, sumAz = 0;
 
   displayShowCalibrating(true);
 
@@ -60,17 +55,18 @@ void imuCalibrate() {
     if (qmi.getDataReady()) {
       float ax, ay, az;
       if (qmi.getAccelerometer(ax, ay, az)) {
-        sumX += ax;
-        sumY += ay;
-        sumZ += az;
+        sumAx += ax;
+        sumAy += ay;
+        sumAz += az;
       }
     }
     delay(10);
   }
 
-  gravityX = sumX / samples;
-  gravityY = sumY / samples;
-  gravityZ = sumZ / samples;
+  // Initialize gravity estimate (in g units)
+  gX = sumAx / samples;
+  gY = sumAy / samples;
+  gZ = sumAz / samples;
 
   isCalibrated = true;
   currentVelocity = 0;
@@ -78,67 +74,115 @@ void imuCalibrate() {
   displayShowCalibrating(false);
   displayDrawSwipeIndicator();
 
-  Serial.printf("Calibrated - Gravity: X=%.2f Y=%.2f Z=%.2f\n",
-                gravityX, gravityY, gravityZ);
+  Serial.printf("Calibrated - Gravity init: X=%.3f Y=%.3f Z=%.3f (g)\n", gX, gY, gZ);
 }
 
-bool imuIsCalibrated() {
-  return isCalibrated;
+bool imuIsCalibrated() { return isCalibrated; }
+
+void imuZeroVelocity() {
+  currentVelocity = 0;
+}
+
+static inline float invSqrt(float x) {
+  return 1.0f / sqrtf(x);
 }
 
 bool imuProcess(float &velocity, float dt) {
-  if (!isCalibrated || !qmi.getDataReady()) {
-    return false;
-  }
+  if (!isCalibrated || !qmi.getDataReady()) return false;
 
   float ax, ay, az;
-  if (!qmi.getAccelerometer(ax, ay, az)) {
-    return false;
-  }
+  if (!qmi.getAccelerometer(ax, ay, az)) return false;
+
+  // Cache accel readings
+  lastAx = ax;
+  lastAy = ay;
+  lastAz = az;
+
+  // Also read gyro (cache for external use)
+  qmi.getGyroscope(lastGx, lastGy, lastGz);
 
   // Sanity check on dt
-  if (dt <= 0 || dt > 0.1) {
-    return false;
+  if (dt <= 0 || dt > 0.1f) return false;
+
+  // 1) Only update gravity estimate when stationary
+  //    Stationary = raw accel magnitude ≈ 1g (no linear acceleration)
+  float accelMag = sqrtf(ax*ax + ay*ay + az*az);
+  bool likelyStationary = fabsf(accelMag - 1.0f) < STATIONARY_THRESHOLD;
+
+  if (likelyStationary) {
+    const float a = GRAVITY_LPF_ALPHA;
+    gX = (1.0f - a) * gX + a * ax;
+    gY = (1.0f - a) * gY + a * ay;
+    gZ = (1.0f - a) * gZ + a * az;
   }
 
-  // Remove gravity to get linear acceleration
-  float linearAccX = ax - gravityX;
-  float linearAccY = ay - gravityY;
-  float linearAccZ = az - gravityZ;
+  // 2) Linear acceleration (g units)
+  float linX = ax - gX;
+  float linY = ay - gY;
+  float linZ = az - gZ;
 
-  // Calculate linear acceleration on primary axis (Z when barbell is horizontal)
-  float linearAcc = linearAccZ * ACCEL_SCALE;  // Convert to m/s²
+  // 3) Define "vertical axis" as gravity direction (unit vector)
+  float gNorm2 = gX*gX + gY*gY + gZ*gZ;
+  if (gNorm2 < 0.5f) return false; // safety
 
-  // Simple integration for velocity (with decay to prevent drift)
-  currentVelocity = currentVelocity * 0.98f + linearAcc * dt;
+  float invG = invSqrt(gNorm2);
+  float gx = gX * invG;
+  float gy = gY * invG;
+  float gz = gZ * invG;
 
-  // Clamp small velocities to zero (noise reduction)
-  if (fabs(currentVelocity) < 0.02f) {
-    currentVelocity = 0;
-  }
+  // 4) Project linear acceleration onto gravity axis (signed)
+  float linAccG = linX*gx + linY*gy + linZ*gz;
+
+  // Convert to m/s^2
+  float linAcc = linAccG * ACCEL_SCALE;
+
+  // 5) Integrate to vertical velocity (m/s) + mild decay
+  float decay = expf(-dt / 0.5f);  // 0.5s time constant
+  currentVelocity = currentVelocity * decay + linAcc * dt;
+
+  // Clamp tiny velocities to zero
+  if (fabsf(currentVelocity) < VELOCITY_NOISE_CLAMP) currentVelocity = 0;
 
   velocity = currentVelocity;
   return true;
 }
 
+bool imuGetGyroMagnitude(float &magnitude) {
+  // Return cached gyro magnitude (degrees/sec)
+  magnitude = sqrtf(lastGx*lastGx + lastGy*lastGy + lastGz*lastGz);
+  return true;
+}
+
+bool imuGetAccel(float &ax, float &ay, float &az) {
+  ax = lastAx;
+  ay = lastAy;
+  az = lastAz;
+  return isCalibrated;
+}
+
+bool imuIsStationary() {
+  float accelMag = sqrtf(lastAx*lastAx + lastAy*lastAy + lastAz*lastAz);
+  return fabsf(accelMag - 1.0f) < STATIONARY_THRESHOLD;
+}
+
 void imuReset() {
   isCalibrated = false;
   currentVelocity = 0;
-  gravityX = gravityY = gravityZ = 0;
+  gX = gY = gZ = 0;
+  lastAx = lastAy = lastAz = 0;
+  lastGx = lastGy = lastGz = 0;
 }
 
 void imuSleep() {
-  // Disable accelerometer and gyroscope for power saving
   qmi.disableAccelerometer();
   qmi.disableGyroscope();
   Serial.println("IMU sleeping");
 }
 
 void imuWake() {
-  // Re-enable sensors
   qmi.enableAccelerometer();
   qmi.enableGyroscope();
-  isCalibrated = false;  // Need recalibration after wake
+  isCalibrated = false;
   currentVelocity = 0;
   Serial.println("IMU awake");
 }

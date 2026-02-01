@@ -1,13 +1,14 @@
 #include "display.h"
+#include "slider.h"
+#include "workout.h"
 #include "config.h"
 
 // Display hardware objects
 static Arduino_DataBus *bus = nullptr;
 static Arduino_GFX *gfx = nullptr;
 static bool isOn = true;
-
-// Row offset - 0 works for this panel
-#define ROW_OFFSET 0
+static Slider brightnessSlider;
+static Slider sensitivitySlider;
 
 void displayInit() {
     // Use Arduino_HWSPI for ESP32-C6
@@ -326,31 +327,32 @@ void displayShowSettings() {
     gfx->setCursor(60, 30);
     gfx->print("Settings");
     
-    // Placeholder items
-    int itemY = 65;
-    int itemH = 40;
+    // Display brightness
+    sliderInit(&brightnessSlider, 60, "BRIGHTNESS", 25, 255, 5, BRIGHTNESS, COLOR_YELLOW);
+    sliderDraw(&brightnessSlider);
     
-    // Brightness
-    gfx->fillRoundRect(10, itemY, 220, itemH, 5, COLOR_DARKGRAY);
-    gfx->setTextSize(2);
-    gfx->setTextColor(COLOR_WHITE);
-    gfx->setCursor(20, itemY + 12);
-    gfx->print("Brightness");
-    
-    // IMU Sensitivity
-    itemY += itemH + 15;
-    gfx->fillRoundRect(10, itemY, 220, itemH, 5, COLOR_DARKGRAY);
-    gfx->setCursor(20, itemY + 12);
-    gfx->print("IMU Sensitivity");
-    
-    // About
-    itemY += itemH + 15;
-    gfx->fillRoundRect(10, itemY, 220, itemH, 5, COLOR_DARKGRAY);
-    gfx->setCursor(20, itemY + 12);
-    gfx->print("About");    
+    // IMU params
+    sliderInit(&sensitivitySlider, 140, "IMU SENSITIVITY", 25, 100, 25, 75, COLOR_CYAN);
+    sliderDraw(&sensitivitySlider);
 }
 
 bool displayInSettingsBackButton(int16_t x, int16_t y) {
     return (x >= SETTINGS_BACK_X && x <= (SETTINGS_BACK_X + SETTINGS_BACK_W) &&
             y >= SETTINGS_BACK_Y && y <= (SETTINGS_BACK_Y + SETTINGS_BACK_H));
+}
+
+bool displaySettingsHandleTouch(int16_t x, int16_t y) {
+    if (sliderHandleTouch(&brightnessSlider, x, y)) {
+        // Apply brightness immediately
+        displaySetBacklight(sliderGetValue(&brightnessSlider));
+        return true;
+    }
+    
+    if (sliderHandleTouch(&sensitivitySlider, x, y)) {
+        // Apply sensitivity to IMU
+        workoutSetSensitivity(sliderGetValue(&sensitivitySlider));
+        return true;
+    }
+    
+    return false;
 }

@@ -3,13 +3,8 @@
 #include "display.h"
 #include "imu.h"
 #include "workout.h"
-#include "storage.h"
 #include "battery.h"
 #include "esp_sleep.h"
-
-// Button B is GPIO 9 (active LOW - pressed = LOW)
-#define SLEEP_BUTTON_PIN 9
-#define BUTTON_LONG_PRESS_MS 1500  // 1.5 seconds for long press
 
 // Button state tracking
 static bool lastButtonState = true;  // HIGH when not pressed
@@ -70,7 +65,7 @@ void powerEnterLightSleep() {
     // Stop workout if running and save data
     if (workoutIsRunning()) {
         workoutStop();
-        storageSaveSession(workoutGetData());
+        /// TODO store session
     }
     
     // Put IMU in low power mode

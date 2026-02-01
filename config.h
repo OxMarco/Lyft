@@ -22,6 +22,11 @@
 #define BRIGHTNESS  255  // Screen brightness: 0-255
 
 // ============== UI LAYOUT ==============
+#define DISPLAY_UPDATE_MS 100  // 10 Hz display refresh
+
+// Row offset - 0 works for this panel
+#define ROW_OFFSET   0
+
 #define BTN_Y_OFFSET    40
 #define BOX_Y_OFFSET    120
 #define VELOCITY_BOX_Y  190
@@ -70,10 +75,32 @@
 #define COLOR_MAGENTA   0xF81F
 
 // ============== WORKOUT SETTINGS ==============
-#define VELOCITY_THRESHOLD      0.15f   // m/s - minimum velocity to detect movement
-#define REP_COMPLETE_THRESHOLD  0.05f   // m/s - velocity near zero = rep complete
-#define MIN_REP_TIME_MS         500     // Minimum time between reps (debounce)
-#define ACCEL_SCALE             9.81f   // m/s² per g
+#define VELOCITY_THRESHOLD 0.15f // m/s - minimum velocity to detect movement
+#define REP_COMPLETE_THRESHOLD 0.05f // m/s - velocity near zero = rep complete
+#define MIN_REP_TIME_MS 500 // Minimum time between reps (debounce)
+#define ACCEL_SCALE 9.81f // m/s² per g
+#define ZERO_CROSS_DEADBAND     0.02f   // m/s: treat |v|<this as zero
+#define PEAK_REQUIRED           0.20f   // m/s: must hit at least this peak each half-cycle
+
+// IMU processing
+#define GRAVITY_LPF_ALPHA       0.01f   // gravity tracking speed (0..1). ~0.01 at ~200-500Hz
+#define ZUPT_STILL_HOLD_MS      200     // must be still this long to zero velocity
+
+// Movement hysteresis (use velocity magnitude)
+#define MOVE_ON_THRESHOLD    0.08f
+#define MOVE_OFF_THRESHOLD   0.08f
+
+// Optional extra noise clamp
+#define VELOCITY_NOISE_CLAMP    0.02f
+
+typedef enum {
+  SENSITIVITY_BASE = 0,    // Very heavy/slow lifts (max effort deadlifts, heavy squats)
+  SENSITIVITY_LOW = 1,     // Heavy compounds (bench, squat, row)
+  SENSITIVITY_MEDIUM = 2,  // Moderate weight / general use
+  SENSITIVITY_HIGH = 3     // Light/fast movements (curls, raises, accessories)
+} SensitivityLevel;
+
+#define SENSITIVITY_COUNT  4
 
 // ============== TOUCH SETTINGS ==============
 #define DEBOUNCE_MS     300
@@ -88,13 +115,12 @@
 #define SD_MISO     21    // SD card MISO - VERIFY THIS  
 #define LOGFILE "/sessions.csv"
 
-// ============== WIFI AP ==============
-#define AP_SSID "BarbellTracker"
-#define AP_PASS "123456789"
-
 // ============== SLEEP SETTINGS ==============
 #define POWER_BUTTON_GPIO 9          // set this to your BOOT GPIO
 #define POWER_BUTTON_ACTIVE_HIGH 1   // press: LOW->HIGH (per your description)
+// Button B is GPIO 9 (active LOW - pressed = LOW)
+#define SLEEP_BUTTON_PIN 9
+#define BUTTON_LONG_PRESS_MS 1500  // 1.5 seconds for long press
 
 // ============== BATTERY ==============
 #define BATTERY_UPDATE_INTERVAL 5000  // Update every 5 seconds

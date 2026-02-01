@@ -1,32 +1,9 @@
-/*
- * Barbell Gym Tracker
- * 
- * A velocity-based training (VBT) tracker for the ESP32-C6-Touch-LCD-1.83
- * 
- * Features:
- * - Rep counting with velocity-based detection
- * - Peak velocity tracking per set
- * - Deep sleep with touch-to-wake
- * - Session logging to flash storage
- * 
- * Hardware: Waveshare ESP32-C6-Touch-LCD-1.83
- * - ST7789 LCD (240x284)
- * - CST816D Touch Controller
- * - QMI8658 6-axis IMU
- * 
- * Controls:
- * - Short press: Start/Stop workout
- * - Long press (2 sec): Enter deep sleep
- * - Touch to wake from sleep
- */
-
 #include <Wire.h>
 #include "config.h"
 #include "display.h"
 #include "touch.h"
 #include "imu.h"
 #include "workout.h"
-#include "storage.h"
 #include "power.h"
 #include "battery.h"
 #include "rtc.h"
@@ -63,13 +40,6 @@ void setup() {
   // Initialize RTC
   if (!rtcInit()) {
     displayError("RTC Error");
-    delay(3000);
-    esp_restart();
-  }
-
-  // Initialize storage
-  if (!storageInit()) {
-    displayError("Storage Error");
     delay(3000);
     esp_restart();
   }
@@ -118,6 +88,8 @@ void loop() {
     if (event == TOUCH_SWIPE_DOWN) {
         inSettingsScreen = false;
         displayRedrawUI(batteryGetPercent());
+    } else if (event == TOUCH_TAP) {
+        displaySettingsHandleTouch(touchX, touchY);
     }
   } else {
     // Main screen touch handling
@@ -135,7 +107,7 @@ void loop() {
           displayDrawButton(false);
 
           // Save session data
-          storageSaveSession(workoutGetData());
+          /// TODO
         } else {
           // Start new workout
           workoutReset();
@@ -149,22 +121,18 @@ void loop() {
   }
 
   // Process IMU data when workout is running
-  if (workoutIsRunning()) {
-    // Calculate time delta
-    unsigned long currentTime = micros();
-    float dt = (currentTime - lastSampleTime) / 1000000.0f;
-    lastSampleTime = currentTime;
+if (workoutIsRunning()) {
+  unsigned long currentTime = micros();
+  float dt = (currentTime - lastSampleTime) / 1000000.0f;
 
-    // Get velocity from IMU
-    float velocity;
-    if (imuProcess(velocity, dt)) {
-      // Process for rep detection
-      workoutProcessVelocity(velocity);
-    }
-
-    // Update elapsed time display
-    workoutUpdateTime();
+  float velocity;
+  if (imuProcess(velocity, dt)) {
+    lastSampleTime = currentTime; // update only on success
+    workoutProcessVelocity(velocity);
   }
+
+  workoutUpdateTime();
+}
 
   if(!inSettingsScreen) {
     // Update battery indicator periodically
