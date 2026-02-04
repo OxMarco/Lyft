@@ -2,10 +2,11 @@
 #include "display.h"
 #include "config.h"
 
-// Internal layout constants
-#define SLIDER_BTN_SIZE    40
-#define SLIDER_BAR_HEIGHT  12
-#define SLIDER_PADDING     10
+// Compact layout constants
+#define SLIDER_HEIGHT      42
+#define SLIDER_PADDING     8
+#define SLIDER_BAR_HEIGHT  16
+#define SLIDER_BAR_Y_OFF   22
 
 void sliderInit(Slider* s, int16_t y, const char* label,
                 int16_t minVal, int16_t maxVal, int16_t step, int16_t startVal,
@@ -13,102 +14,93 @@ void sliderInit(Slider* s, int16_t y, const char* label,
     s->x = SLIDER_PADDING;
     s->y = y;
     s->width = LCD_WIDTH - (SLIDER_PADDING * 2);
-    s->height = 70;
-    
+    s->height = SLIDER_HEIGHT;
+
     s->minVal = minVal;
     s->maxVal = maxVal;
     s->step = step;
     s->value = constrain(startVal, minVal, maxVal);
-    
+
     s->label = label;
     s->accentColor = accentColor;
 }
 
 void sliderDraw(Slider* s) {
     Arduino_GFX* gfx = displayGetGFX();
-    
-    // Background box
-    gfx->fillRoundRect(s->x, s->y, s->width, s->height, 5, COLOR_DARKGRAY);
-    gfx->drawRoundRect(s->x, s->y, s->width, s->height, 5, COLOR_LIGHTGRAY);
-    
-    // Label
+
+    // Background
+    gfx->fillRoundRect(s->x, s->y, s->width, s->height, 4, COLOR_DARKGRAY);
+
+    // Label (left)
     gfx->setTextSize(1);
     gfx->setTextColor(COLOR_WHITE);
-    gfx->setCursor(s->x + 10, s->y + 6);
+    gfx->setCursor(s->x + 6, s->y + 6);
     gfx->print(s->label);
-    
-    // Minus button
-    int btnY = s->y + 22;
-    gfx->fillRoundRect(s->x + 8, btnY, SLIDER_BTN_SIZE, SLIDER_BTN_SIZE, 5, COLOR_BLACK);
-    gfx->drawRoundRect(s->x + 8, btnY, SLIDER_BTN_SIZE, SLIDER_BTN_SIZE, 5, COLOR_WHITE);
-    gfx->setTextSize(3);
-    gfx->setTextColor(COLOR_WHITE);
-    gfx->setCursor(s->x + 20, btnY + 8);
-    gfx->print("-");
-    
-    // Plus button
-    int plusX = s->x + s->width - SLIDER_BTN_SIZE - 8;
-    gfx->fillRoundRect(plusX, btnY, SLIDER_BTN_SIZE, SLIDER_BTN_SIZE, 5, COLOR_BLACK);
-    gfx->drawRoundRect(plusX, btnY, SLIDER_BTN_SIZE, SLIDER_BTN_SIZE, 5, COLOR_WHITE);
-    gfx->setTextSize(3);
-    gfx->setTextColor(COLOR_WHITE);
-    gfx->setCursor(plusX + 10, btnY + 8);
-    gfx->print("+");
-    
-    // Draw the value bar
+
+    // Draw the bar and value
     sliderUpdateValue(s);
 }
 
 void sliderUpdateValue(Slider* s) {
     Arduino_GFX* gfx = displayGetGFX();
-    
-    // Bar position (between the buttons)
-    int barX = s->x + SLIDER_BTN_SIZE + 18;
-    int barY = s->y + 30;
-    int barWidth = s->width - (SLIDER_BTN_SIZE * 2) - 36;
-    
+
+    // Bar dimensions
+    int barX = s->x + 6;
+    int barY = s->y + SLIDER_BAR_Y_OFF;
+    int barWidth = s->width - 12;
+
     // Clear bar area
-    gfx->fillRect(barX - 2, barY - 2, barWidth + 4, SLIDER_BAR_HEIGHT + 16, COLOR_DARKGRAY);
-    
-    // Bar background
-    gfx->fillRoundRect(barX, barY, barWidth, SLIDER_BAR_HEIGHT, 3, COLOR_BLACK);
-    
+    gfx->fillRect(barX, barY, barWidth, SLIDER_BAR_HEIGHT, COLOR_BLACK);
+
     // Filled portion
     int fillWidth = map(s->value, s->minVal, s->maxVal, 0, barWidth);
     if (fillWidth > 0) {
-        gfx->fillRoundRect(barX, barY, fillWidth, SLIDER_BAR_HEIGHT, 3, s->accentColor);
+        gfx->fillRect(barX, barY, fillWidth, SLIDER_BAR_HEIGHT, s->accentColor);
     }
-    
-    // Percentage text
+
+    // Left/right tap indicators
+    gfx->setTextSize(2);
+    gfx->setTextColor(COLOR_WHITE);
+    gfx->setCursor(barX + 4, barY + 1);
+    gfx->print("-");
+    gfx->setCursor(barX + barWidth - 16, barY + 1);
+    gfx->print("+");
+
+    // Percentage text (top right, update area)
     int percent = map(s->value, s->minVal, s->maxVal, 0, 100);
     char buf[8];
-    sprintf(buf, "%d%%", percent);
-    
+    sprintf(buf, "%3d%%", percent);
+
+    // Clear old percentage area
+    gfx->fillRect(s->x + s->width - 36, s->y + 4, 32, 12, COLOR_DARKGRAY);
+
     gfx->setTextSize(1);
-    gfx->setTextColor(COLOR_WHITE);
-    int textX = barX + (barWidth - strlen(buf) * 6) / 2;
-    gfx->setCursor(textX, barY + SLIDER_BAR_HEIGHT + 4);
+    gfx->setTextColor(s->accentColor);
+    gfx->setCursor(s->x + s->width - 32, s->y + 6);
     gfx->print(buf);
 }
 
 bool sliderHandleTouch(Slider* s, int16_t touchX, int16_t touchY) {
-    int btnY = s->y + 22;
-    
-    // Check minus button
-    if (touchX >= s->x + 8 && touchX <= s->x + 8 + SLIDER_BTN_SIZE &&
-        touchY >= btnY && touchY <= btnY + SLIDER_BTN_SIZE) {
+    // Check if touch is within slider bounds (with extra vertical tolerance)
+    int tolerance = 8;
+    if (touchX < s->x - tolerance || touchX > s->x + s->width + tolerance ||
+        touchY < s->y - tolerance || touchY > s->y + s->height + tolerance) {
+        return false;
+    }
+
+    // Left half decreases, right half increases
+    int midX = s->x + s->width / 2;
+
+    if (touchX < midX) {
+        // Decrease
         if (s->value > s->minVal) {
             s->value -= s->step;
             if (s->value < s->minVal) s->value = s->minVal;
             sliderUpdateValue(s);
             return true;
         }
-    }
-    
-    // Check plus button
-    int plusX = s->x + s->width - SLIDER_BTN_SIZE - 8;
-    if (touchX >= plusX && touchX <= plusX + SLIDER_BTN_SIZE &&
-        touchY >= btnY && touchY <= btnY + SLIDER_BTN_SIZE) {
+    } else {
+        // Increase
         if (s->value < s->maxVal) {
             s->value += s->step;
             if (s->value > s->maxVal) s->value = s->maxVal;
@@ -116,7 +108,7 @@ bool sliderHandleTouch(Slider* s, int16_t touchX, int16_t touchY) {
             return true;
         }
     }
-    
+
     return false;
 }
 

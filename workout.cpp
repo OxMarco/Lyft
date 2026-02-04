@@ -1,9 +1,11 @@
+#include <math.h>
 #include "workout.h"
 #include "config.h"
 #include "imu.h"
 #include "display.h"
-#include <Arduino.h>
-#include <math.h>
+#include "sound.h"
+#include "storage.h"
+#include "rtc.h"
 
 // ============================================================================
 // Sensitivity storage and names
@@ -102,6 +104,17 @@ static uint32_t lastDbgMs = 0;
 // ============================================================================
 // Sensitivity helpers
 // ============================================================================
+
+int getImuSensitivity() {
+  // Map enum to 1-100
+  switch (currentSensitivity) {
+    case SENSITIVITY_BASE:   return 20;
+    case SENSITIVITY_LOW:    return 40;
+    case SENSITIVITY_MEDIUM: return 70;
+    case SENSITIVITY_HIGH:   return 90;
+    default:                 return 70;
+  }
+}
 
 void workoutSetSensitivity(int value) {
   // Clamp to 1-100
@@ -246,11 +259,13 @@ void workoutStart() {
   workoutRunning = true;
   lastSampleMs = 0;
   updateDisplay(true);
+  playStartWorkoutSound();
 }
 
 void workoutStop() {
   workoutRunning = false;
   setActive = false;
+  playStopWorkoutSound();
 }
 
 bool workoutIsRunning() { return workoutRunning; }
@@ -381,3 +396,45 @@ uint32_t workoutGetTotalTimeMs() { return totalTimeMs; }
 uint32_t workoutGetRestTimeMs()  { return restTimeMs; }
 float workoutGetPeakVelocity()   { return peakVelocity; }
 int workoutGetReps()             { return reps; }
+
+// ============================================================================
+// Storage
+// ============================================================================
+
+static const char* CSV_HEADER = "timestamp,reps,duration_s,rest_s,peak_vel,sensitivity";
+
+bool workoutSave() {
+  // Don't save empty workouts
+  if (reps == 0 && totalTimeMs < 1000) {
+    Serial.println("Workout not saved: no reps or too short");
+    return false;
+  }
+
+  // Create file with header if it doesn't exist
+  if (!fileExists(LOGFILE)) {
+    if (!createFile(LOGFILE, String(CSV_HEADER) + "\n")) {
+      Serial.println("Failed to create log file");
+      return false;
+    }
+    Serial.println("Created new log file with header");
+  }
+
+  // Build CSV row
+  char row[128];
+  snprintf(row, sizeof(row), "%s,%d,%u,%u,%.3f,%s\n",
+           getTimestamp(),
+           reps,
+           totalTimeMs / 1000,
+           restTimeMs / 1000,
+           peakVelocity,
+           SENSITIVITY_NAMES[currentSensitivity]);
+
+  // Append to file
+  if (!appendToFile(LOGFILE, String(row))) {
+    Serial.println("Failed to append workout to log");
+    return false;
+  }
+
+  Serial.printf("Workout saved: %s", row);
+  return true;
+}

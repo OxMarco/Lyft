@@ -5,8 +5,9 @@
 #include "workout.h"
 #include "battery.h"
 #include "esp_sleep.h"
+#include "sound.h"
 
-// Button state tracking
+// Sleep button state tracking
 static bool lastButtonState = true;  // HIGH when not pressed
 static unsigned long buttonPressStart = 0;
 static bool longPressHandled = false;
@@ -17,15 +18,15 @@ static bool justWokeFromSleep = false;
 void powerInit() {
     // Configure sleep button as input with pull-up
     pinMode(SLEEP_BUTTON_PIN, INPUT_PULLUP);
-    
+
     // Check if we woke from light sleep
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
         Serial.println("Woke from light sleep via button");
         justWokeFromSleep = true;
     }
-    
-    Serial.printf("Power init - Sleep button: GPIO%d (long press to sleep)\n", SLEEP_BUTTON_PIN);
+
+    Serial.printf("Power init - Sleep button: GPIO%d\n", SLEEP_BUTTON_PIN);
 }
 
 void powerUpdate() {
@@ -52,11 +53,12 @@ void powerUpdate() {
     if (currentState == HIGH && lastButtonState == LOW) {
         if (!longPressHandled) {
             // Short press - could add other functionality here
-            Serial.println("Button short press (no action)");
+            Serial.println("Sleep button short press (no action)");
         }
     }
-    
+
     lastButtonState = currentState;
+
 }
 
 void powerEnterLightSleep() {
@@ -73,6 +75,9 @@ void powerEnterLightSleep() {
     
     // Turn off display
     displaySleep();
+
+    // Play power-off sound
+    playPowerOffSound();
     
     Serial.println("Entering light sleep... (press button to wake)");
     Serial.flush();
@@ -111,10 +116,12 @@ void powerEnterLightSleep() {
     // Wake IMU
     imuWake();
     
-    // Wake display, show splash screen and redraw UI
+    // Wake display, show splash screen, play startup sound and redraw UI
     displayWake();
     displaySplashScreen();
-    delay(3000);
+    audioInit();
+    playPowerOnSound();
+    delay(1500);
     displayRedrawUI(batteryGetPercent());
 
     // Reset button state to prevent retriggering
@@ -131,3 +138,4 @@ bool powerJustWoke() {
 void powerClearWokeFlag() {
     justWokeFromSleep = false;
 }
+

@@ -26,7 +26,10 @@ Bar speed is one of the best indicators of fatigue and effort in strength traini
 - **Set timer** that starts when you move
 - **Adjustable sensitivity** for heavy singles to fast accessories
 - **Sleep mode** for all-day battery life
-
+- **Audio feedback** with configurable volume (start/stop sounds)
+- **BLE data sync** to export workout logs to your phone
+- **Workout logging** with timestamped session data (CSV format)
+- **RTC clock** for accurate timestamps
 
 ## How it works
 
@@ -49,10 +52,13 @@ The device samples a 6-axis IMU at 500Hz. A low-pass filter continuously tracks 
 
 | Component | Part |
 |-----------|------|
-| MCU | ESP32-C6 |
+| MCU | ESP32-C6 (Wi-Fi 6 + BLE 5) |
 | Display | 1.83" ST7789 LCD (240×284, touch) |
 | IMU | QMI8658 (6-axis) |
-| Power | LiPo |
+| Audio | ES8311 codec + speaker |
+| RTC | PCF85063 |
+| Storage | Internal flash (LittleFS) |
+| Power | LiPo with AXP2101 PMU |
 
 ## Sensitivity Levels
 
@@ -71,18 +77,35 @@ Different lifts move at different speeds. Lyft lets you adjust sensitivity via t
 2. Tap **START** to begin a set
 3. Perform your lift—the device calibrates automatically
 4. Watch your velocity and rep count update in real-time
-5. Tap **STOP** when done
-6. Swipe up for settings (sensitivity, brightness)
+5. Tap **STOP** when done (workout is saved automatically)
+6. Swipe up for settings (sensitivity, brightness, volume)
 7. Long-press the button to sleep
+
+### BLE Data Sync
+
+1. In settings, tap **BLE ON** to start advertising
+2. Connect with a BLE terminal app (e.g., nRF Connect, Serial Bluetooth Terminal)
+3. Look for the Nordic UART Service (NUS)
+4. Send `SYNC` to receive your workout log
+5. Send `PING` to test the connection
+
+### Workout Log Format
+
+Sessions are saved to `/sessions.csv` with the following columns:
+```csv
+timestamp,reps,duration_s,rest_s,peak_vel,sensitivity
+```
 
 ## Building
 
 Requires [Arduino IDE](https://www.arduino.cc/en/software) or PlatformIO with ESP32 board support.
 
 Dependencies:
-- `Arduino_GFX_Library`
-- `SensorLib` (for QMI8658)
-- `Wire`
+- `Arduino_GFX_Library` - Display driver
+- `SensorLib` - QMI8658 IMU & PCF85063 RTC
+- `NimBLE-Arduino` - BLE stack
+- `LittleFS` - File storage (included with ESP32 core)
+- `ESP_I2S` - Audio output (included with ESP32 core)
 
 Flash to your ESP32-C6 and you're ready to lift.
 

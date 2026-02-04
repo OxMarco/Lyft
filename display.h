@@ -61,5 +61,17 @@ void displayDrawSwipeIndicator();
 void displayShowSettings();
 bool displayInSettingsBackButton(int16_t x, int16_t y);
 bool displaySettingsHandleTouch(int16_t x, int16_t y);
+bool displaySettingsTimeButtonPressed();
+
+// BLE toggle
+void displayDrawBleButton();
+bool displayGetBleEnabled();
+void displaySetBleEnabled(bool enabled);
+
+// Date/Time picker
+void displayShowDateTimePicker();
+bool displayDateTimePickerHandleTouch(int16_t x, int16_t y);
+bool displayDateTimePickerIsConfirmed();
+void displayDateTimePickerGetValues(uint16_t* year, uint8_t* month, uint8_t* day, uint8_t* hour, uint8_t* minute);
 
 #endif // DISPLAY_H

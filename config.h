@@ -16,6 +16,21 @@
 
 #define GFX_BL      LCD_BL
 
+// ============== AUDIO SETTINGS ==============
+
+#define I2S_NUM I2S_NUM_0
+#define I2S_MCK_PIN 19
+#define I2S_BCK_PIN 20
+#define I2S_LRCK_PIN 22
+#define I2S_DOUT_PIN 23
+#define I2S_DIN_PIN 21
+#define PA_CTRL_PIN 0
+
+#define AUDIO_SAMPLE_RATE (24000)
+#define AUDIO_MCLK_MULTIPLE (256)
+#define AUDIO_MCLK_FREQ_HZ (AUDIO_SAMPLE_RATE * AUDIO_MCLK_MULTIPLE)
+#define AUDIO_VOLUME (70)
+
 // ============== DISPLAY SETTINGS ==============
 #define LCD_WIDTH   240
 #define LCD_HEIGHT  284
@@ -122,6 +137,12 @@ typedef enum {
 // Button B is GPIO 9 (active LOW - pressed = LOW)
 #define SLEEP_BUTTON_PIN 9
 #define BUTTON_LONG_PRESS_MS 1500  // 1.5 seconds for long press
+
+// ============== BLE SETTINGS ==============
+#define BLE_DEVICE_NAME     "Lyft"
+#define BLE_SERVICE_UUID    "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"  // Nordic UART Service
+#define BLE_TX_CHAR_UUID    "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  // TX (notify)
+#define BLE_RX_CHAR_UUID    "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  // RX (write)
 
 // ============== BATTERY ==============
 #define BATTERY_UPDATE_INTERVAL 5000  // Update every 5 seconds
