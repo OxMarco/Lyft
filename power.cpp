@@ -62,10 +62,10 @@ void powerUpdate() {
 void powerEnterLightSleep() {
     Serial.println("Preparing for light sleep...");
     
-    // Stop workout if running and save data
+    // Stop workout if running
     if (workoutIsRunning()) {
         workoutStop();
-        /// TODO store session
+        // TODO: save session data
     }
     
     // Put IMU in low power mode
@@ -111,8 +111,10 @@ void powerEnterLightSleep() {
     // Wake IMU
     imuWake();
     
-    // Wake display and redraw UI
+    // Wake display, show splash screen and redraw UI
     displayWake();
+    displaySplashScreen();
+    delay(3000);
     displayRedrawUI(batteryGetPercent());
 
     // Reset button state to prevent retriggering

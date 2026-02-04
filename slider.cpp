@@ -29,11 +29,11 @@ void sliderDraw(Slider* s) {
     
     // Background box
     gfx->fillRoundRect(s->x, s->y, s->width, s->height, 5, COLOR_DARKGRAY);
-    gfx->drawRoundRect(s->x, s->y, s->width, s->height, 5, s->accentColor);
+    gfx->drawRoundRect(s->x, s->y, s->width, s->height, 5, COLOR_LIGHTGRAY);
     
     // Label
     gfx->setTextSize(1);
-    gfx->setTextColor(s->accentColor);
+    gfx->setTextColor(COLOR_WHITE);
     gfx->setCursor(s->x + 10, s->y + 6);
     gfx->print(s->label);
     

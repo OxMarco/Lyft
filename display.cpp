@@ -2,6 +2,7 @@
 #include "slider.h"
 #include "workout.h"
 #include "config.h"
+#include "image.h"
 
 // Display hardware objects
 static Arduino_DataBus *bus = nullptr;
@@ -139,12 +140,17 @@ void displayError(const char *text) {
     gfx->print(text);
 }
 
+void displaySplashScreen() {
+  // Draw the Lyft logo image (240x280) for 3 seconds
+  gfx->draw16bitBeRGBBitmap(0, 0, (uint16_t *)gImage_image, 240, 280);
+}
+
 void displayDrawButton(bool isRunning) {
     uint16_t btnColor = isRunning ? COLOR_RED : COLOR_GREEN;
     const char *btnText = isRunning ? "STOP" : "START";
 
     gfx->fillRoundRect(BTN_X, BTN_Y, BTN_WIDTH, BTN_HEIGHT, BTN_RADIUS, btnColor);
-    gfx->drawRoundRect(BTN_X, BTN_Y, BTN_WIDTH, BTN_HEIGHT, BTN_RADIUS, COLOR_WHITE);
+    gfx->drawRoundRect(BTN_X, BTN_Y, BTN_WIDTH, BTN_HEIGHT, BTN_RADIUS, COLOR_LIGHTGRAY);
 
     if (isRunning) {
         gfx->setTextColor(COLOR_WHITE);
@@ -164,20 +170,20 @@ void displayDrawButton(bool isRunning) {
 void displayDrawValueBoxes() {
     // Left box (Reps)
     gfx->fillRoundRect(BOX_LEFT_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT, BOX_RADIUS, COLOR_DARKGRAY);
-    gfx->drawRoundRect(BOX_LEFT_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT, BOX_RADIUS, COLOR_CYAN);
+    gfx->drawRoundRect(BOX_LEFT_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT, BOX_RADIUS, COLOR_LIGHTGRAY);
 
     // Right box (Time)
     gfx->fillRoundRect(BOX_RIGHT_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT, BOX_RADIUS, COLOR_DARKGRAY);
-    gfx->drawRoundRect(BOX_RIGHT_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT, BOX_RADIUS, COLOR_YELLOW);
+    gfx->drawRoundRect(BOX_RIGHT_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT, BOX_RADIUS, COLOR_LIGHTGRAY);
 
     // Labels
     gfx->setTextSize(1);
 
-    gfx->setTextColor(COLOR_CYAN);
+    gfx->setTextColor(COLOR_WHITE);
     gfx->setCursor(BOX_LEFT_X + 36, BOX_Y + 6);
     gfx->print("REPS");
 
-    gfx->setTextColor(COLOR_YELLOW);
+    gfx->setTextColor(COLOR_WHITE);
     gfx->setCursor(BOX_RIGHT_X + 28, BOX_Y + 6);
     gfx->print("TIME(s)");
 
@@ -187,10 +193,10 @@ void displayDrawValueBoxes() {
 
 void displayDrawVelocityBox() {
     gfx->fillRoundRect(VBOX_X, VBOX_Y, VBOX_WIDTH, VBOX_HEIGHT, BOX_RADIUS, COLOR_DARKGRAY);
-    gfx->drawRoundRect(VBOX_X, VBOX_Y, VBOX_WIDTH, VBOX_HEIGHT, BOX_RADIUS, COLOR_MAGENTA);
+    gfx->drawRoundRect(VBOX_X, VBOX_Y, VBOX_WIDTH, VBOX_HEIGHT, BOX_RADIUS, COLOR_LIGHTGRAY);
 
     gfx->setTextSize(1);
-    gfx->setTextColor(COLOR_MAGENTA);
+    gfx->setTextColor(COLOR_WHITE);
     gfx->setCursor(VBOX_X + 70, VBOX_Y + 6);
     gfx->print("PEAK VEL (m/s)");
 
@@ -200,7 +206,7 @@ void displayDrawVelocityBox() {
 void displayUpdateReps(int value) {
     gfx->fillRect(BOX_LEFT_X + 10, BOX_Y + 22, BOX_WIDTH - 20, 28, COLOR_DARKGRAY);
     gfx->setTextSize(3);
-    gfx->setTextColor(COLOR_WHITE);
+    gfx->setTextColor(COLOR_CYAN);
 
     char buf[8];
     sprintf(buf, "%3d", constrain(value, 0, 999));
@@ -211,7 +217,7 @@ void displayUpdateReps(int value) {
 void displayUpdateTime(int value) {
     gfx->fillRect(BOX_RIGHT_X + 10, BOX_Y + 22, BOX_WIDTH - 20, 28, COLOR_DARKGRAY);
     gfx->setTextSize(3);
-    gfx->setTextColor(COLOR_WHITE);
+    gfx->setTextColor(COLOR_CYAN);
 
     char buf[8];
     sprintf(buf, "%3d", constrain(value, 0, 999));
@@ -222,7 +228,7 @@ void displayUpdateTime(int value) {
 void displayUpdatePeakVelocity(float value) {
     gfx->fillRect(VBOX_X + 20, VBOX_Y + 22, VBOX_WIDTH - 40, 24, COLOR_DARKGRAY);
     gfx->setTextSize(3);
-    gfx->setTextColor(COLOR_WHITE);
+    gfx->setTextColor(COLOR_CYAN);
 
     char buf[8];
     sprintf(buf, "%.2f", value);

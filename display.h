@@ -22,6 +22,9 @@ bool displayIsOn();
 // Clear screen and show error message (centered, auto-sized)
 void displayError(const char *text);
 
+// Show the logo image
+void displaySplashScreen();
+
 // Draw the start/stop button
 void displayDrawButton(bool isRunning);
 

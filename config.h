@@ -69,6 +69,7 @@
 #define COLOR_BLACK     0x0000
 #define COLOR_WHITE     0xFFFF
 #define COLOR_DARKGRAY  0x4208
+#define COLOR_LIGHTGRAY 0xC618
 #define COLOR_CYAN      0x07FF
 #define COLOR_YELLOW    0xFFE0
 #define COLOR_ORANGE    0xFD20

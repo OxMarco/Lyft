@@ -64,15 +64,17 @@ void setup() {
   // Initialize workout tracker
   workoutInit();
 
-  // Draw initial UI
-  displayRedrawUI(batteryGetPercent());
-
   // Initialize timing
   lastSampleTime = micros();
 
   Serial.println(getTimestamp());
   Serial.println("Setup complete!");
   Serial.println("-----------------------------\n");
+
+  displaySplashScreen();
+  delay(3000);
+
+  displayRedrawUI(batteryGetPercent());
 }
 
 void loop() {
@@ -106,8 +108,7 @@ void loop() {
           workoutStop();
           displayDrawButton(false);
 
-          // Save session data
-          /// TODO
+          // TODO: save session data
         } else {
           // Start new workout
           workoutReset();
